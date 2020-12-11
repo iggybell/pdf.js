@@ -243,6 +243,12 @@ function getFontType(type, subtype) {
   }
 }
 
+function getStandardFontName(name) {
+  const fontName = name.replace(/[,_]/g, "-").replace(/\s/g, "");
+  const stdFontMap = getStdFontMap();
+  return stdFontMap[fontName];
+}
+
 // Some bad PDF generators, e.g. Scribus PDF, include glyph names
 // in a 'uniXXXX' format -- attempting to recover proper ones.
 function recoverGlyphName(name, glyphsUnicodeMap) {
@@ -3393,7 +3399,17 @@ function type1FontGlyphMapping(properties, builtInEncoding, glyphNames) {
   var glyphId, charCode, baseEncoding;
   var isSymbolicFont = !!(properties.flags & FontFlags.Symbolic);
 
-  if (properties.baseEncodingName) {
+  if (properties.isStandardFont) {
+    baseEncoding = builtInEncoding;
+    for (charCode = 0; charCode < baseEncoding.length; charCode++) {
+      glyphId = glyphNames.indexOf(baseEncoding[charCode]);
+      if (glyphId >= 0) {
+        charCodeToGlyphId[charCode] = glyphId;
+      } else {
+        charCodeToGlyphId[charCode] = 0; // notdef
+      }
+    }
+  } else if (properties.baseEncodingName) {
     // If a valid base encoding name was used, the mapping is initialized with
     // that.
     baseEncoding = getEncoding(properties.baseEncodingName);
@@ -3912,6 +3928,9 @@ var CFFFont = (function CFFFontClosure() {
       }
 
       var encoding = cff.encoding ? cff.encoding.encoding : null;
+      if (properties.isStandardFont) {
+        encoding = properties.defaultEncoding;
+      }
       charCodeToGlyphId = type1FontGlyphMapping(properties, encoding, charsets);
       return charCodeToGlyphId;
     },
@@ -3931,4 +3950,5 @@ export {
   ToUnicodeMap,
   IdentityToUnicodeMap,
   getFontType,
+  getStandardFontName,
 };

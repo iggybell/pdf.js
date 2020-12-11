@@ -40,13 +40,18 @@ import {
   deprecated,
   DOMCanvasFactory,
   DOMCMapReaderFactory,
+  DOMStandardFontDataFactory,
   loadScript,
   PageViewport,
   RenderingCancelledException,
   StatTimer,
 } from "./display_utils.js";
 import { FontFaceObject, FontLoader } from "./font_loader.js";
-import { NodeCanvasFactory, NodeCMapReaderFactory } from "./node_utils.js";
+import {
+  NodeCanvasFactory,
+  NodeCMapReaderFactory,
+  NodeStandardFontDataFactory,
+} from "./node_utils.js";
 import { AnnotationStorage } from "./annotation_storage.js";
 import { apiCompatibilityParams } from "./api_compatibility.js";
 import { CanvasGraphics } from "./canvas.js";
@@ -69,6 +74,10 @@ const DefaultCMapReaderFactory =
   (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) && isNodeJS
     ? NodeCMapReaderFactory
     : DOMCMapReaderFactory;
+const DefaultStandardFontDataFactory =
+  (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) && isNodeJS
+    ? NodeStandardFontDataFactory
+    : DOMStandardFontDataFactory;
 
 /**
  * @typedef {function} IPDFStreamFactory
@@ -271,6 +280,8 @@ function getDocument(src) {
   params.rangeChunkSize = params.rangeChunkSize || DEFAULT_RANGE_CHUNK_SIZE;
   params.CMapReaderFactory =
     params.CMapReaderFactory || DefaultCMapReaderFactory;
+  params.StandardFontDataFactory =
+    params.StandardFontDataFactory || DefaultStandardFontDataFactory;
   params.ignoreErrors = params.stopAtErrors !== true;
   params.fontExtraProperties = params.fontExtraProperties === true;
   params.pdfBug = params.pdfBug === true;
@@ -2085,6 +2096,10 @@ class WorkerTransport {
       isCompressed: params.cMapPacked,
     });
 
+    this.StandardFontDataFactory = new params.StandardFontDataFactory({
+      baseUrl: params.standardFontDataUrl,
+    });
+
     this.destroyed = false;
     this.destroyCapability = null;
     this._passwordCapability = null;
@@ -2470,6 +2485,30 @@ class WorkerTransport {
       "UnsupportedFeature",
       this._onUnsupportedFeature.bind(this)
     );
+
+    messageHandler.on("FetchStandardFontData", (data, sink) => {
+      if (this.destroyed) {
+        sink.error(new Error("Worker was destroyed"));
+        return;
+      }
+      let fetched = false;
+
+      sink.onPull = () => {
+        if (fetched) {
+          sink.close();
+          return;
+        }
+        fetched = true;
+
+        this.StandardFontDataFactory.fetch(data)
+          .then(function (fontData) {
+            sink.enqueue({ data: fontData }, 1, [fontData.buffer]);
+          })
+          .catch(function (reason) {
+            sink.error(reason);
+          });
+      };
+    });
 
     messageHandler.on("FetchBuiltInCMap", (data, sink) => {
       if (this.destroyed) {
