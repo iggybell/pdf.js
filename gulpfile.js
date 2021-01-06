@@ -837,6 +837,14 @@ function buildGeneric(defines, dir) {
         base: "external/bcmaps",
       })
       .pipe(gulp.dest(dir + "web/cmaps")),
+    gulp
+      .src(
+        ["external/standard_fonts/*.pfb", "external/standard_fonts/LICENSE"],
+        {
+          base: "external/standard_fonts",
+        }
+      )
+      .pipe(gulp.dest(dir + "web/standard_fonts")),
     preprocessHTML("web/viewer.html", defines).pipe(gulp.dest(dir + "web")),
     preprocessCSS("web/viewer.css", "generic", defines, true)
       .pipe(
@@ -1009,6 +1017,14 @@ function buildMinified(defines, dir) {
         base: "external/bcmaps",
       })
       .pipe(gulp.dest(dir + "web/cmaps")),
+    gulp
+      .src(
+        ["external/standard_fonts/*.pfb", "external/standard_fonts/LICENSE"],
+        {
+          base: "external/standard_fonts",
+        }
+      )
+      .pipe(gulp.dest(dir + "web/standard_fonts")),
 
     preprocessHTML("web/viewer.html", defines).pipe(gulp.dest(dir + "web")),
     preprocessCSS("web/viewer.css", "minified", defines, true)
@@ -1237,6 +1253,14 @@ gulp.task(
           base: "external/bcmaps",
         })
         .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/cmaps")),
+      gulp
+        .src(
+          ["external/standard_fonts/*.pfb", "external/standard_fonts/LICENSE"],
+          {
+            base: "external/standard_fonts",
+          }
+        )
+        .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/standard_fonts")),
 
       preprocessHTML("web/viewer.html", defines).pipe(
         gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
@@ -1317,6 +1341,17 @@ gulp.task(
             base: "external/bcmaps",
           })
           .pipe(gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/cmaps")),
+        gulp
+          .src(
+            [
+              "external/standard_fonts/*.pfb",
+              "external/standard_fonts/LICENSE",
+            ],
+            {
+              base: "external/standard_fonts",
+            }
+          )
+          .pipe(gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/standard_fonts")),
 
         preprocessHTML("web/viewer.html", defines).pipe(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")
@@ -2035,6 +2070,11 @@ gulp.task(
         gulp.src(GENERIC_DIR + "LICENSE").pipe(gulp.dest(DIST_DIR)),
         gulp
           .src(GENERIC_DIR + "web/cmaps/**/*", { base: GENERIC_DIR + "web" })
+          .pipe(gulp.dest(DIST_DIR)),
+        gulp
+          .src(GENERIC_DIR + "web/standard_fonts/**/*", {
+            base: GENERIC_DIR + "web",
+          })
           .pipe(gulp.dest(DIST_DIR)),
         gulp
           .src([

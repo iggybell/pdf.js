@@ -47,11 +47,13 @@ import {
   Ref,
   RefSet,
 } from "./primitives.js";
+import { DecodeStream, Stream } from "./stream.js";
 import {
   ErrorFont,
   Font,
   FontFlags,
   getFontType,
+  getStandardFontName,
   IdentityToUnicodeMap,
   ToUnicodeMap,
 } from "./fonts.js";
@@ -85,7 +87,6 @@ import {
 } from "./image_utils.js";
 import { bidi } from "./bidi.js";
 import { ColorSpace } from "./colorspace.js";
-import { DecodeStream } from "./stream.js";
 import { getGlyphsUnicode } from "./glyphlist.js";
 import { getMetrics } from "./metrics.js";
 import { MurmurHash3_64 } from "./murmurhash3.js";
@@ -384,6 +385,48 @@ class PartialEvaluator {
       // Given the size of uncompressed CMaps, only cache compressed ones.
       this.builtInCMapCache.set(name, data);
     }
+    return data;
+  }
+
+  async fetchStandardFontData(name) {
+    const standardFontNameToFileName = {
+      Courier: "FoxitFixed",
+      "Courier-Bold": "FoxitFixedBold",
+      "Courier-BoldOblique": "FoxitFixedBoldItalic",
+      "Courier-Oblique": "FoxitFixedItalic",
+      Helvetica: "FoxitSans",
+      "Helvetica-Bold": "FoxitSansBold",
+      "Helvetica-BoldOblique": "FoxitSansBoldItalic",
+      "Helvetica-Oblique": "FoxitSansItalic",
+      "Times-Roman": "FoxitSerif",
+      "Times-Bold": "FoxitSerifBold",
+      "Times-BoldItalic": "FoxitSerifBoldItalic",
+      "Times-Italic": "FoxitSerifItalic",
+      Symbol: "FoxitSymbol",
+      ZapfDingbats: "FoxitDingbats",
+    };
+
+    const readableStream = this.handler.sendWithStream(
+      "FetchStandardFontData",
+      {
+        filename: standardFontNameToFileName[name],
+      }
+    );
+    const reader = readableStream.getReader();
+
+    const data = await new Promise(function (resolve, reject) {
+      function pump() {
+        reader.read().then(function ({ value, done }) {
+          if (done) {
+            return;
+          }
+          resolve(value.data);
+          pump();
+        }, reject);
+      }
+      pump();
+    });
+
     return data;
   }
 
@@ -3376,6 +3419,7 @@ class PartialEvaluator {
         properties = {
           type,
           name: baseFontName,
+          loadedName: baseDict.loadedName,
           widths: metrics.widths,
           defaultWidth: metrics.defaultWidth,
           flags,
@@ -3383,6 +3427,13 @@ class PartialEvaluator {
           lastChar,
         };
         const widths = dict.get("Widths");
+        const standardFontName = getStandardFontName(baseFontName);
+        let file = null;
+        if (standardFontName) {
+          const data = await this.fetchStandardFontData(standardFontName);
+          file = new Stream(data);
+          properties.isStandardFont = true;
+        }
         return this.extractDataStructures(dict, dict, properties).then(
           newProperties => {
             if (widths) {
@@ -3398,7 +3449,7 @@ class PartialEvaluator {
                 newProperties
               );
             }
-            return new Font(baseFontName, null, newProperties);
+            return new Font(baseFontName, file, newProperties);
           }
         );
       }
@@ -3441,6 +3492,7 @@ class PartialEvaluator {
       throw new FormatError("invalid font name");
     }
 
+    let isStandardFont = false;
     var fontFile = descriptor.get("FontFile", "FontFile2", "FontFile3");
     if (fontFile) {
       if (fontFile.dict) {
@@ -3452,6 +3504,13 @@ class PartialEvaluator {
         var length2 = fontFile.dict.get("Length2");
         var length3 = fontFile.dict.get("Length3");
       }
+    } else if (type === "Type1") {
+      const standardFontName = getStandardFontName(fontName.name);
+      if (standardFontName) {
+        const data = await this.fetchStandardFontData(standardFontName);
+        fontFile = new Stream(data);
+        isStandardFont = true;
+      }
     }
 
     properties = {
@@ -3462,6 +3521,7 @@ class PartialEvaluator {
       length1,
       length2,
       length3,
+      isStandardFont,
       loadedName: baseDict.loadedName,
       composite,
       fixedPitch: false,

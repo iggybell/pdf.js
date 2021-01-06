@@ -178,6 +178,14 @@ const defaultOptions = {
         : "../web/cmaps/",
     kind: OptionKind.API,
   },
+  standardFontDataUrl: {
+    /** @type {string} */
+    value:
+      typeof PDFJSDev === "undefined" || !PDFJSDev.test("PRODUCTION")
+        ? "../external/standard_fonts/"
+        : "../web/standard_fonts/",
+    kind: OptionKind.API,
+  },
   disableAutoFetch: {
     /** @type {boolean} */
     value: false,
